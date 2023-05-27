@@ -141,7 +141,7 @@ func TestHmacKey(t *testing.T) {
 	}
 }
 
-// TestCredentialManagerReuse tests that subsequent calls to the same CredentialManager preduce predictable results
+// TestCredentialManagerReuse tests that subsequent calls to the same CredentialManager produce predictable results
 func TestCredentialManagerReuse(t *testing.T) {
 	cm := NewCredentialManager(sha1.New, []byte("Off with their heads!"))
 
