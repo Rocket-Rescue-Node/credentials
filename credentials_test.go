@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Rocket-Pool-Rescue-Node/credentials/pb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -20,7 +21,7 @@ func TestCredentialRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cred, err := cm.Create(time.Now(), nodeID)
+	cred, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_SOLO)
 	if err != nil {
 		t.Error(err)
 	}
@@ -78,7 +79,7 @@ func TestCredentialStolenMac(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cred, err := cm.Create(time.Now(), nodeID)
+	cred, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_ROCKETPOOL)
 	if err != nil {
 		t.Error(err)
 	}
@@ -87,7 +88,48 @@ func TestCredentialStolenMac(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cred2, err := cm.Create(time.Now(), nodeID2)
+	cred2, err := cm.Create(time.Now(), nodeID2, pb.OperatorType_OT_ROCKETPOOL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Swap MACs and make sure Verify returns an error
+	cred.Mac, cred2.Mac = cred2.Mac, cred.Mac
+	err = cm.Verify(cred)
+	if err == nil {
+		t.Fail()
+	}
+	err = cm.Verify(cred2)
+	if err == nil {
+		t.Fail()
+	}
+
+	// Swap back and make sure Verify now works
+	cred.Mac, cred2.Mac = cred2.Mac, cred.Mac
+	err = cm.Verify(cred)
+	if err != nil {
+		t.Error(err)
+	}
+	err = cm.Verify(cred2)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// TestCredentialTypeMac creates 2 authenticated credentials but with different operator types, swaps their MACs, and ensures they do not pass Verify
+func TestCredentialTypeMac(t *testing.T) {
+	cm := NewCredentialManager(sha1.New, []byte("We're all mad here"))
+
+	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
+	if err != nil {
+		t.Error(err)
+	}
+	cred, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_ROCKETPOOL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	cred2, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_SOLO)
 	if err != nil {
 		t.Error(err)
 	}
@@ -125,7 +167,7 @@ func TestHmacKey(t *testing.T) {
 		t.Error(err)
 	}
 
-	cred, err := cm.Create(time.Now(), nodeID)
+	cred, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_ROCKETPOOL)
 	if err != nil {
 		t.Error(err)
 	}
@@ -149,11 +191,11 @@ func TestCredentialManagerReuse(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cred, err := cm.Create(time.Now(), nodeID)
+	cred, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_ROCKETPOOL)
 	if err != nil {
 		t.Error(err)
 	}
-	cred2, err := cm.Create(time.Now(), nodeID)
+	cred2, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_ROCKETPOOL)
 	if err != nil {
 		t.Error(err)
 	}

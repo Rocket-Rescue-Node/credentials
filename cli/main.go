@@ -39,6 +39,7 @@ func main() {
 	secretFlag := flag.String("s", "test-secret", "Secret to use")
 	outputJsonFlag := flag.Bool("j", false, "Whether or not to print the credential in human-readable json")
 	parseToJsonFlag := flag.String("p", "", "Parses a credential and prints it in human-readable json")
+	typeFlag := flag.Int("o", 0, "Operator Type to use (0 for RP, 1 for Solo)")
 
 	flag.Parse()
 
@@ -76,7 +77,7 @@ func main() {
 		return
 	}
 
-	cred, err := cm.Create(t, nodeID)
+	cred, err := cm.Create(t, nodeID, credentials.OperatorType(*typeFlag))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)

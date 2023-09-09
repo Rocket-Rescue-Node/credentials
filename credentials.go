@@ -18,12 +18,14 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type OperatorType = pb.OperatorType
 type AuthenticatedCredential pb.AuthenticatedCredential
 
 type jsonAuthenticatedCredential struct {
-	NodeID    string `json:"node_id"`
-	Timestamp int64  `json:"timestamp"`
-	Mac       string `json:"mac"`
+	NodeID       string       `json:"node_id"`
+	Timestamp    int64        `json:"timestamp"`
+	OperatorType OperatorType `json:"operator_type"`
+	Mac          string       `json:"mac"`
 }
 
 func (ac *AuthenticatedCredential) Pb() *pb.AuthenticatedCredential {
@@ -41,9 +43,10 @@ func (ac *AuthenticatedCredential) MarshalJSON() ([]byte, error) {
 	encoder.Close()
 
 	return json.Marshal(&jsonAuthenticatedCredential{
-		NodeID:    nodeID,
-		Timestamp: ac.Credential.Timestamp,
-		Mac:       mac.String(),
+		NodeID:       nodeID,
+		Timestamp:    ac.Credential.Timestamp,
+		OperatorType: ac.Credential.OperatorType,
+		Mac:          mac.String(),
 	})
 }
 
@@ -68,6 +71,7 @@ func (ac *AuthenticatedCredential) UnmarshalJSON(data []byte) error {
 	}
 
 	ac.Credential.NodeId = nodeID
+	ac.Credential.OperatorType = j.OperatorType
 	ac.Credential.Timestamp = j.Timestamp
 	ac.Mac = decoded
 	return nil
@@ -175,13 +179,14 @@ func (c *CredentialManager) authenticateCredential(credential *AuthenticatedCred
 }
 
 // Create makes a new credential and authenticates it, returning a protoc struct that can be marshaled/unmarshaled
-func (c *CredentialManager) Create(timestamp time.Time, nodeID []byte) (*AuthenticatedCredential, error) {
+func (c *CredentialManager) Create(timestamp time.Time, nodeID []byte, OperatorType OperatorType) (*AuthenticatedCredential, error) {
 	if len(nodeID) != 20 {
 		return nil, fmt.Errorf("invalid nodeID length. Expected 20, got %d", len(nodeID))
 	}
 	message := AuthenticatedCredential{}
 	message.Credential = &pb.Credential{}
 	message.Credential.NodeId = nodeID
+	message.Credential.OperatorType = OperatorType
 	message.Credential.Timestamp = timestamp.Unix()
 
 	if err := c.authenticateCredential(&message); err != nil {
