@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Rocket-Pool-Rescue-Node/credentials"
+	"github.com/Rocket-Rescue-Node/credentials"
 )
 
 const timestampFormat = "Mon 02 Jan 2006 3:04:05 PM MST"

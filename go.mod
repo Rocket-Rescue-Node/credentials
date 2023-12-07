@@ -1,4 +1,4 @@
-module github.com/Rocket-Pool-Rescue-Node/credentials
+module github.com/Rocket-Rescue-Node/credentials
 
 go 1.18
 

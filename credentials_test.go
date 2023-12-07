@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Rocket-Pool-Rescue-Node/credentials/pb"
+	"github.com/Rocket-Rescue-Node/credentials/pb"
 	"google.golang.org/protobuf/proto"
 )
 
