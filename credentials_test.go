@@ -2,7 +2,6 @@ package credentials
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
 	"io"
@@ -15,7 +14,7 @@ import (
 
 // TestCredentialRoundTrip creates, anthenticates, marshals, encodes, decodes, unmarshals, and verifies a credential
 func TestCredentialRoundTrip(t *testing.T) {
-	cm := NewCredentialManager(sha1.New, []byte("Curiouser and curiouser"))
+	cm := NewCredentialManager([]byte("Curiouser and curiouser"))
 
 	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {
@@ -73,7 +72,7 @@ func TestCredentialRoundTrip(t *testing.T) {
 
 // TestCredentialStolenMac creates 2 authenticated credentials, swaps their MACs, and ensures that they don't pass Verify
 func TestCredentialStolenMac(t *testing.T) {
-	cm := NewCredentialManager(sha1.New, []byte("We're all mad here"))
+	cm := NewCredentialManager([]byte("We're all mad here"))
 
 	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {
@@ -118,7 +117,7 @@ func TestCredentialStolenMac(t *testing.T) {
 
 // TestCredentialTypeMac creates 2 authenticated credentials but with different operator types, swaps their MACs, and ensures they do not pass Verify
 func TestCredentialTypeMac(t *testing.T) {
-	cm := NewCredentialManager(sha1.New, []byte("We're all mad here"))
+	cm := NewCredentialManager([]byte("We're all mad here"))
 
 	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {
@@ -159,8 +158,8 @@ func TestCredentialTypeMac(t *testing.T) {
 
 // TestHmacKey sanity-tests that a MAC is only valid for a given key
 func TestHmacKey(t *testing.T) {
-	cm := NewCredentialManager(sha1.New, []byte("T'was brillig"))
-	cm2 := NewCredentialManager(sha1.New, []byte("And the slithy toves did gyre"))
+	cm := NewCredentialManager([]byte("T'was brillig"))
+	cm2 := NewCredentialManager([]byte("And the slithy toves did gyre"))
 
 	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {
@@ -185,7 +184,7 @@ func TestHmacKey(t *testing.T) {
 
 // TestCredentialManagerReuse tests that subsequent calls to the same CredentialManager produce predictable results
 func TestCredentialManagerReuse(t *testing.T) {
-	cm := NewCredentialManager(sha1.New, []byte("Off with their heads!"))
+	cm := NewCredentialManager([]byte("Off with their heads!"))
 
 	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {

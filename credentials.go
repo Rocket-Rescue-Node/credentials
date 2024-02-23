@@ -3,6 +3,7 @@ package credentials
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -148,11 +149,11 @@ type CredentialManager struct {
 }
 
 // NewCredentialManager creates a new CredentialManager which can create and verify authenticated credentials
-func NewCredentialManager(h func() hash.Hash, key []byte) *CredentialManager {
+func NewCredentialManager(key []byte) *CredentialManager {
 	return &CredentialManager{
 		sync.Pool{
 			New: func() any {
-				return hmac.New(h, key)
+				return hmac.New(sha256.New, key)
 			},
 		},
 	}

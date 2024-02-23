@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -61,7 +60,7 @@ func main() {
 		return
 	}
 
-	cm := credentials.NewCredentialManager(sha256.New, []byte(*secretFlag))
+	cm := credentials.NewCredentialManager([]byte(*secretFlag))
 
 	nodeID, err := hex.DecodeString(strings.TrimPrefix(*nodeAddrFlag, "0x"))
 	if err != nil {
