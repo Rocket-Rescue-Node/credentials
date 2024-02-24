@@ -167,7 +167,8 @@ type CredentialManager struct {
 func idFromKey(key []byte) *ID {
 	h := hashAlgo()
 	h.Write([]byte("rescue-credential-id"))
-	idBinary := h.Sum(key)
+	h.Write(key)
+	idBinary := h.Sum(nil)
 	return &ID{
 		bytes: *(*[32]byte)(idBinary),
 		words: words.Encode(idBinary),
@@ -224,7 +225,8 @@ func (c *CredentialManager) authenticateCredential(credential *AuthenticatedCred
 	// defer stacks calls, so Put will always be called after the Reset() below
 	defer c.p.Put(v)
 
-	credential.Mac = v.primary.hmac.Sum(bytes)
+	v.primary.hmac.Write(bytes)
+	credential.Mac = v.primary.hmac.Sum(nil)
 	defer v.primary.hmac.Reset()
 
 	return nil
@@ -265,7 +267,8 @@ func (c *CredentialManager) Verify(authenticatedCredential *AuthenticatedCredent
 
 	secrets := append([]secret{v.primary}, v.extras...)
 	for _, s := range secrets {
-		mac := s.hmac.Sum(bytes)
+		s.hmac.Write(bytes)
+		mac := s.hmac.Sum(nil)
 		defer s.hmac.Reset()
 		if hmac.Equal(mac, authenticatedCredential.Mac) {
 			// A secret was able to auth this credential,
