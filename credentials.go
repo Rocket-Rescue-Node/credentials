@@ -3,9 +3,11 @@ package credentials
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -14,9 +16,11 @@ import (
 	"time"
 
 	"github.com/Rocket-Rescue-Node/credentials/pb"
-	"github.com/pkg/errors"
+	"github.com/Rocket-Rescue-Node/credentials/words"
 	"google.golang.org/protobuf/proto"
 )
+
+var hashAlgo = sha256.New
 
 type OperatorType = pb.OperatorType
 type AuthenticatedCredential pb.AuthenticatedCredential
@@ -142,38 +146,86 @@ func (ac *AuthenticatedCredential) Base64URLDecode(username string, password str
 	return nil
 }
 
+type secret struct {
+	id   *ID
+	hmac hash.Hash
+}
+
+type checker struct {
+	primary secret
+	extras  []secret
+}
+
 // CredentialManager authenticates and verifies rescue node credentials
 type CredentialManager struct {
-	sync.Pool
+	// pool is a pool of checkers
+	id         *ID
+	partnerIDs []*ID
+	p          sync.Pool
+}
+
+func idFromKey(key []byte) *ID {
+	h := hashAlgo()
+	h.Write([]byte("rescue-credential-id"))
+	idBinary := h.Sum(key)
+	return &ID{
+		bytes: *(*[32]byte)(idBinary),
+		words: words.Encode(idBinary),
+	}
 }
 
 // NewCredentialManager creates a new CredentialManager which can create and verify authenticated credentials
-func NewCredentialManager(h func() hash.Hash, key []byte) *CredentialManager {
-	return &CredentialManager{
-		sync.Pool{
+// Credentials are created with `key` but validated against `key` and all `extraSecrets`.
+// Under the hood, the library uses sha256 as an hmac hash, so keys should be at least 32 bytes for full security.
+func NewCredentialManager(key []byte, extraSecrets ...[]byte) *CredentialManager {
+	id := idFromKey(key)
+
+	out := &CredentialManager{
+		id: id,
+		p: sync.Pool{
 			New: func() any {
-				return hmac.New(h, key)
+				numExtras := len(extraSecrets)
+				out := new(checker)
+				out.primary = secret{
+					id:   id,
+					hmac: hmac.New(hashAlgo, key),
+				}
+				if numExtras > 0 {
+					out.extras = make([]secret, numExtras)
+					for i, s := range extraSecrets {
+						out.extras[i] = secret{
+							id:   idFromKey(s),
+							hmac: hmac.New(hashAlgo, s),
+						}
+					}
+				}
+				return out
 			},
 		},
 	}
+	out.partnerIDs = make([]*ID, 0)
+	for _, s := range extraSecrets {
+		out.partnerIDs = append(out.partnerIDs, idFromKey(s))
+	}
+	return out
 }
 
 func (c *CredentialManager) authenticateCredential(credential *AuthenticatedCredential) error {
 	// Serialize just the inner message so we can authenticate it and add it to the outer message
 	bytes, err := proto.Marshal(credential.Credential)
 	if err != nil {
-		return errors.Wrap(err, "Error serializing HMAC protobuf body")
+		return errors.Join(err, SerializationError)
 	}
 
-	h, ok := c.Get().(hash.Hash)
+	v, ok := c.p.Get().(*checker)
 	if !ok {
-		return errors.New("Couldn't retrieve available hash from pool")
+		return MemoryError
 	}
+	// defer stacks calls, so Put will always be called after the Reset() below
+	defer c.p.Put(v)
 
-	h.Write(bytes)
-	credential.Mac = h.Sum(nil)
-	h.Reset()
-	c.Put(h)
+	credential.Mac = v.primary.hmac.Sum(bytes)
+	defer v.primary.hmac.Reset()
 
 	return nil
 }
@@ -197,21 +249,40 @@ func (c *CredentialManager) Create(timestamp time.Time, nodeID []byte, OperatorT
 }
 
 // Verify checks that a AuthenticatedCredential has a valid mac
-func (c *CredentialManager) Verify(authenticatedCredential *AuthenticatedCredential) error {
-	// Create a temporary AuthenticatedCredential and borrow the inner message from the provided credential
-	tmp := AuthenticatedCredential{}
-	tmp.Credential = authenticatedCredential.Credential
-
-	// Auth tmp
-	if err := c.authenticateCredential(&tmp); err != nil {
-		return errors.Wrap(err, "Error while re-creating the MAC")
+func (c *CredentialManager) Verify(authenticatedCredential *AuthenticatedCredential) (*ID, error) {
+	// Grab the byte representation of the inner message
+	bytes, err := proto.Marshal(authenticatedCredential.Credential)
+	if err != nil {
+		return nil, errors.Join(err, SerializationError)
 	}
 
-	// Check that tmp's MAC matches the provided one.
-	if !hmac.Equal(tmp.Mac, authenticatedCredential.Mac) {
-		// MAC didn't match. Authenticity cannot be verified.
-		return errors.New("credential MAC mismatch")
+	v, ok := c.p.Get().(*checker)
+	if !ok {
+		return nil, MemoryError
 	}
+	// defer stacks calls, so Put will always be called after the Reset() calls below
+	defer c.p.Put(v)
 
-	return nil
+	secrets := append([]secret{v.primary}, v.extras...)
+	for _, s := range secrets {
+		mac := s.hmac.Sum(bytes)
+		defer s.hmac.Reset()
+		if hmac.Equal(mac, authenticatedCredential.Mac) {
+			// A secret was able to auth this credential,
+			// return its ID
+			return s.id, nil
+		}
+	}
+	// MAC didn't match. Authenticity cannot be verified.
+	return nil, MismatchError
+}
+
+// ID returns the ID struct of the primary secret
+func (c *CredentialManager) ID() *ID {
+	return c.id
+}
+
+// PartnerIDs returns a slice of ID structs of partner secrets
+func (c *CredentialManager) PartnerIDs() []*ID {
+	return c.partnerIDs
 }
