@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -35,7 +36,7 @@ func main() {
 
 	nodeAddrFlag := flag.String("n", "", "Node address for which to generate the credential (required)")
 	timeFlag := flag.String("t", time.Now().Format(timestampFormat), "Timestamp to use")
-	secretFlag := flag.String("s", "test-secret", "Secret to use")
+	secretFlag := flag.String("s", "", "Secret to use")
 	outputJsonFlag := flag.Bool("j", false, "Whether or not to print the credential in human-readable json")
 	parseToJsonFlag := flag.String("p", "", "Parses a credential and prints it in human-readable json")
 	typeFlag := flag.Int("o", 0, "Operator Type to use (0 for RP, 1 for Solo)")
@@ -60,7 +61,20 @@ func main() {
 		return
 	}
 
-	cm := credentials.NewCredentialManager([]byte(*secretFlag))
+	if len(*secretFlag) == 0 {
+		fmt.Fprintf(os.Stderr, "-s flag required\nUsage: cred-cli [OPTIONS]")
+		flag.PrintDefaults()
+		os.Exit(1)
+		return
+	}
+	entropy, err := base64.StdEncoding.DecodeString(*secretFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+		return
+	}
+
+	cm := credentials.NewCredentialManager(entropy)
 
 	nodeID, err := hex.DecodeString(strings.TrimPrefix(*nodeAddrFlag, "0x"))
 	if err != nil {
