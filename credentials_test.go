@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"testing"
@@ -271,5 +272,126 @@ func TestCredentialMultiSecretUnmatched(t *testing.T) {
 
 	if !errors.Is(err, MismatchError) {
 		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+// TestJSONMarshalUnmarshal tests the JSON marshaling and unmarshaling of AuthenticatedCredential
+func TestJSONMarshalUnmarshal(t *testing.T) {
+	cm := NewCredentialManager([]byte("JSON test secret"))
+
+	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cred, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_SOLO)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Marshal to JSON
+	jsonData, err := json.Marshal(cred)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Unmarshal from JSON
+	var unmarshaledCred AuthenticatedCredential
+	err = json.Unmarshal(jsonData, &unmarshaledCred)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Compare original and unmarshaled credentials
+	if !bytes.Equal(cred.Credential.NodeId, unmarshaledCred.Credential.NodeId) {
+		t.Error("NodeId mismatch after JSON round-trip")
+	}
+	if cred.Credential.Timestamp != unmarshaledCred.Credential.Timestamp {
+		t.Error("Timestamp mismatch after JSON round-trip")
+	}
+	if cred.Credential.OperatorType != unmarshaledCred.Credential.OperatorType {
+		t.Error("OperatorType mismatch after JSON round-trip")
+	}
+	if !bytes.Equal(cred.Mac, unmarshaledCred.Mac) {
+		t.Error("Mac mismatch after JSON round-trip")
+	}
+
+	// Verify the unmarshaled credential
+	_, err = cm.Verify(&unmarshaledCred)
+	if err != nil {
+		t.Error("Failed to verify unmarshaled credential:", err)
+	}
+}
+
+// TestBase64URLEncodeDecode tests the Base64URL encoding and decoding of AuthenticatedCredential
+func TestBase64URLEncodeDecode(t *testing.T) {
+	cm := NewCredentialManager([]byte("Base64 test secret"))
+
+	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cred, err := cm.Create(time.Now(), nodeID, pb.OperatorType_OT_ROCKETPOOL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Encode to Base64URL
+	username := cred.Base64URLEncodeUsername()
+	password, err := cred.Base64URLEncodePassword()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Decode from Base64URL
+	var decodedCred AuthenticatedCredential
+	err = decodedCred.Base64URLDecode(username, password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Compare original and decoded credentials
+	if !bytes.Equal(cred.Credential.NodeId, decodedCred.Credential.NodeId) {
+		t.Error("NodeId mismatch after Base64URL round-trip")
+	}
+	if cred.Credential.Timestamp != decodedCred.Credential.Timestamp {
+		t.Error("Timestamp mismatch after Base64URL round-trip")
+	}
+	if cred.Credential.OperatorType != decodedCred.Credential.OperatorType {
+		t.Error("OperatorType mismatch after Base64URL round-trip")
+	}
+	if !bytes.Equal(cred.Mac, decodedCred.Mac) {
+		t.Error("Mac mismatch after Base64URL round-trip")
+	}
+
+	// Verify the decoded credential
+	_, err = cm.Verify(&decodedCred)
+	if err != nil {
+		t.Error("Failed to verify decoded credential:", err)
+	}
+}
+
+// TestInvalidBase64URLDecode tests the Base64URLDecode function with invalid input
+func TestInvalidBase64URLDecode(t *testing.T) {
+	var cred AuthenticatedCredential
+
+	// Test with invalid Base64 username
+	err := cred.Base64URLDecode("invalid!base64", "validbase64")
+	if err == nil {
+		t.Error("Expected error for invalid username, got nil")
+	}
+
+	// Test with invalid Base64 password
+	err = cred.Base64URLDecode("validbase64", "invalid!base64")
+	if err == nil {
+		t.Error("Expected error for invalid password, got nil")
+	}
+
+	// Test with valid Base64 but invalid proto message
+	validBase64 := base64.URLEncoding.EncodeToString([]byte("invalid proto message"))
+	err = cred.Base64URLDecode(validBase64, validBase64)
+	if err == nil {
+		t.Error("Expected error for invalid proto message, got nil")
 	}
 }

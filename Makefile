@@ -17,3 +17,7 @@ test: protos
 
 ./cred-cli: cli/main.go
 	go build -o cred-cli cli/main.go 
+
+.PHONY: install
+install: ./cred-cli
+	mv cred-cli ${GOPATH}/bin
