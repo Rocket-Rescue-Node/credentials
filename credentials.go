@@ -101,14 +101,15 @@ func (ac *AuthenticatedCredential) Base64URLEncodePassword() (string, error) {
 	nodeID := ac.Credential.NodeId
 	// Strip it to save space
 	ac.Credential.NodeId = nil
+	// Restore it when we're done
+	defer func() {
+		ac.Credential.NodeId = nodeID
+	}()
 
 	marshaled, err := proto.Marshal(ac.Pb())
 	if err != nil {
 		return "", err
 	}
-
-	// Restore the nodeId
-	ac.Credential.NodeId = nodeID
 
 	// Encode the marshaled proto
 	encoder := base64.NewEncoder(base64.URLEncoding, &out)
