@@ -33,7 +33,7 @@ const timestampFormat = "Mon 02 Jan 2006 3:04:05 PM MST"
 func validateSignedMessage(inp string) (*SignedMessage, error) {
 	var sm SignedMessage
 
-	// Strip newlines form inp
+	// Strip newlines from inp
 	inp = strings.ReplaceAll(inp, "\n", "")
 
 	err := json.Unmarshal([]byte(inp), &sm)
