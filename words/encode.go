@@ -4,7 +4,7 @@ package words
 func Encode(key []byte) []string {
 	out := make([]string, len(key))
 	for i, b := range key {
-		out[i] = words[i%2][b]
+		out[i] = words[i%2][b%256]
 	}
 	return out
 }
